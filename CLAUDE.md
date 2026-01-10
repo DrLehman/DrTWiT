@@ -4,7 +4,7 @@
 
 **DrTWiT** is an Electron desktop application for accessing TWiT (This Week in Tech), a video/audio podcast network. The app supports both free and membership-based feeds.
 
-**Current State**: Early development - repository contains only README and LICENSE files. The codebase needs to be scaffolded and built out.
+**Current State**: Core Electron + React app is built. Ready for packaging as a macOS .app/.dmg.
 
 ## Intended Tech Stack
 
@@ -16,58 +16,63 @@
 
 ```
 DrTWiT/
-├── CLAUDE.md          # This file - AI assistant guide
-├── LICENSE            # MIT License
-└── README.md          # Project overview and development notes
-```
-
-### Planned Structure (When Built Out)
-
-```
-DrTWiT/
 ├── src/
 │   ├── main/          # Electron main process
 │   │   └── main.ts    # Main entry point
 │   ├── renderer/      # React renderer process
 │   │   ├── components/
-│   │   ├── pages/
 │   │   └── App.tsx
 │   └── preload/       # Preload scripts for IPC
-├── public/            # Static assets
-├── dist/              # Build output
-├── package.json
+├── build/             # App icons and build assets
+├── dist/              # Build output (generated)
+├── release/           # Packaged .app/.dmg output (generated)
+├── package.json       # Build config with electron-builder
 ├── tsconfig.json
-├── electron-builder.json
-└── vite.config.ts     # or webpack.config.js
+└── vite.config.ts
 ```
 
-## Development Workflow
+## Building the macOS App
 
-### Prerequisites (When Implemented)
+### For Users (No npm required!)
+
+Download the `.dmg` from Releases, open it, and drag DrTWiT to Applications.
+
+### For Developers
 
 ```bash
-# Install dependencies
+# Install dependencies (one-time setup)
 npm install
 
-# Start development server
-npm run dev
-
-# Build for production
-npm run build
-
-# Package the Electron app
-npm run package
+# Package for macOS (creates .app and .dmg)
+npm run package:mac
 ```
 
-### Key Commands (Planned)
+### Packaging Commands
+
+| Command | Description |
+|---------|-------------|
+| `npm run package:mac` | Build .app and .dmg for both Intel and Apple Silicon |
+| `npm run package:mac:dmg` | Build only the .dmg installer |
+| `npm run package:mac:arm64` | Build for Apple Silicon (M1/M2/M3) only |
+| `npm run package:mac:x64` | Build for Intel Macs only |
+
+Output files appear in the `release/` directory:
+- `DrTWiT-1.0.0.dmg` - Installer with drag-to-Applications
+- `DrTWiT-1.0.0-mac.zip` - Compressed .app bundle
+
+### App Icon
+
+Place your icon at `build/icon.icns`. See `build/README.md` for instructions on creating the icon file.
+
+## Development Workflow (Optional)
+
+For development/debugging only:
 
 | Command | Description |
 |---------|-------------|
 | `npm run dev` | Start Electron in dev mode with hot reload |
 | `npm run build` | Build the React app |
-| `npm run package` | Package as distributable Electron app |
 | `npm run lint` | Run ESLint |
-| `npm test` | Run tests |
 
 ## Code Conventions
 
