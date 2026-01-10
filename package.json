@@ -10,6 +10,10 @@
     "build": "tsc && vite build",
     "build:electron": "tsc -p tsconfig.main.json",
     "package": "npm run build && npm run build:electron && electron-builder",
+    "package:mac": "npm run build && npm run build:electron && electron-builder --mac",
+    "package:mac:dmg": "npm run build && npm run build:electron && electron-builder --mac dmg",
+    "package:mac:arm64": "npm run build && npm run build:electron && electron-builder --mac --arm64",
+    "package:mac:x64": "npm run build && npm run build:electron && electron-builder --mac --x64",
     "lint": "eslint src --ext .ts,.tsx",
     "typecheck": "tsc --noEmit"
   },
@@ -44,7 +48,40 @@
       "package.json"
     ],
     "mac": {
-      "category": "public.app-category.entertainment"
+      "category": "public.app-category.entertainment",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        },
+        {
+          "target": "zip",
+          "arch": ["x64", "arm64"]
+        }
+      ],
+      "icon": "build/icon.icns",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false
+    },
+    "dmg": {
+      "title": "${productName} ${version}",
+      "icon": "build/icon.icns",
+      "contents": [
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
+      ],
+      "window": {
+        "width": 540,
+        "height": 400
+      }
     },
     "win": {
       "target": "nsis"
