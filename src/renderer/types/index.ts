@@ -1,32 +1,14 @@
-export interface Show {
-  id: string
-  name: string
-}
+export type {
+  CustomFeedSource,
+  Episode,
+  FeedRequest,
+  FeedResult,
+  FeedSource,
+  FeedSourceKind,
+  TwitAPI,
+} from '../../shared/types'
 
-export interface Episode {
-  guid: string
-  title: string
-  description: string
-  pubDate: string
-  duration: string
-  thumbnail: string | null
-  audioUrl: string | null
-  videoUrl: string | null
-  link: string
-}
-
-export interface Feed {
-  title: string
-  description: string
-  image: string | null
-  author: string
-  episodes: Episode[]
-}
-
-export interface TwitAPI {
-  getShows: () => Promise<Show[]>
-  getFeed: (showId: string) => Promise<Feed>
-}
+import type { TwitAPI } from '../../shared/types'
 
 declare global {
   interface Window {

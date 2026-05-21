@@ -1,38 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { FeedRequest, FeedResult, FeedSource, TwitAPI } from '../shared/types'
 
-export interface Show {
-  id: string
-  name: string
-}
-
-export interface Episode {
-  guid: string
-  title: string
-  description: string
-  pubDate: string
-  duration: string
-  thumbnail: string | null
-  audioUrl: string | null
-  videoUrl: string | null
-  link: string
-}
-
-export interface Feed {
-  title: string
-  description: string
-  image: string | null
-  author: string
-  episodes: Episode[]
-}
-
-export interface TwitAPI {
-  getShows: () => Promise<Show[]>
-  getFeed: (showId: string) => Promise<Feed>
-}
-
+// The preload bridge is intentionally tiny: it exposes typed request methods
+// but does not leak ipcRenderer to React. That keeps the renderer constrained to
+// the app's feed contract while the main process remains responsible for remote
+// network access and RSS parsing.
 const api: TwitAPI = {
-  getShows: () => ipcRenderer.invoke('get-shows'),
-  getFeed: (showId: string) => ipcRenderer.invoke('get-feed', showId),
+  getBuiltInSources: () => ipcRenderer.invoke('get-built-in-sources') as Promise<FeedSource[]>,
+  getFeed: (request: FeedRequest) => ipcRenderer.invoke('get-feed', request) as Promise<FeedResult>,
 }
 
 contextBridge.exposeInMainWorld('twit', api)

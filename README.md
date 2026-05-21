@@ -1,15 +1,52 @@
 # DrTWiT
-TWiT Electron App
 
+DrTWiT is a desktop player for browsing and playing shows from the TWiT podcast network. It is built with Electron, React, Vite, and TypeScript.
 
-# How this was made:
+## Current Status
 
-I have a custom set of instructions that I created called IcarusShell (included).  I told it the app I wanted, and to start by making a scaffold.md per Icarus (included but editted by the AI as it worked):
+This project is in active local development. The current focus is getting the redesigned app satisfying in local npm testing before any production build, package, DMG, or release work happens.
 
-"Read icarusshell.md, and let's run through the process to build the scaffold for creating an electron app for a video/audio network called TWiT.  There's free feeds and membership feeds.  Run through Icarus with me and we'll knock out a minimal electron REACT app to do this.@icarusshell.md "
+## What It Does Today
 
-The rest was just running and troubleshooting and vibe coding.
+- Lists a curated set of TWiT shows.
+- Loads recent episodes from TWiT RSS feeds.
+- Lets you add private/member RSS feed URLs and stores them locally on this device.
+- Searches and filters the loaded episode list.
+- Shows episode metadata, artwork, dates, descriptions, and durations when available.
+- Provides audio and video playback controls when feed items expose usable media URLs.
 
-# Bugs
+## Developer Setup
 
-I vibe coded this, so I wont' be issuing bug fixes unless it bugs me.  Feel free to fork and go nuts!
+Prerequisites:
+
+- Node.js and npm.
+- macOS for the current packaging workflow.
+
+Install dependencies:
+
+```bash
+npm ci
+```
+
+Run the app in local development mode:
+
+```bash
+npm run dev
+```
+
+`npm run dev` starts the Vite renderer and locally transpiles the Electron main/preload files needed for the development app. It is not a release build.
+
+Run local verification checks:
+
+```bash
+npm run typecheck
+```
+
+Do not run production build or packaging commands until the local app is fully satisfactory.
+
+## Project Notes
+
+- The canonical project roadmap and working memory live in `scaffold.MD`.
+- Private/member RSS URLs are local app data. They are not account credentials, not synced, and not stored in this repository.
+- Build assets live under `build/`; see `build/README.md` for app icon notes.
+- Generated folders such as `node_modules/`, `dist/`, and `release/` are intentionally ignored.

@@ -4,9 +4,10 @@
   "description": "Electron desktop app for TWiT (This Week in Tech) podcast network",
   "main": "dist/main/main/main.js",
   "scripts": {
-    "dev": "concurrently \"npm run dev:vite\" \"npm run dev:electron\"",
+    "dev": "concurrently \"npm run dev:vite\" \"npm run dev:main\" \"npm run dev:electron\"",
     "dev:vite": "vite",
-    "dev:electron": "wait-on http://localhost:5173 && electron .",
+    "dev:main": "tsc -p tsconfig.main.json --watch --preserveWatchOutput",
+    "dev:electron": "wait-on http://localhost:5173 dist/main/main/main.js dist/main/preload/preload.js && electron .",
     "build": "tsc && vite build",
     "build:electron": "tsc -p tsconfig.main.json",
     "package": "npm run build && npm run build:electron && electron-builder",
@@ -15,7 +16,7 @@
     "package:mac:arm64": "npm run build && npm run build:electron && electron-builder --mac --arm64",
     "package:mac:x64": "npm run build && npm run build:electron && electron-builder --mac --x64",
     "lint": "eslint src --ext .ts,.tsx",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit && tsc -p tsconfig.main.json --noEmit"
   },
   "keywords": ["electron", "twit", "podcast", "react"],
   "author": "NewCoffee7477",
