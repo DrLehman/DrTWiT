@@ -38,6 +38,7 @@ lerna-debug.log*
 .env.*
 !.env.example
 *.local
+secrets/
 
 # Editor and tool state
 .idea/
