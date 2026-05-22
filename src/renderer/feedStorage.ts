@@ -50,7 +50,17 @@ export function createCustomFeed(name: string, feedUrl: string): CustomFeedSourc
 // repeats the same protocol check before fetching because renderer validation is
 // not a trust boundary.
 export function normalizeFeedUrl(feedUrl: string): string {
-  const parsedUrl = new URL(feedUrl.trim())
+  let parsedUrl: URL
+
+  // URL parsing throws browser-specific exception text for malformed input.
+  // Convert that into stable product copy here so the add-feed form can show a
+  // useful error without leaking implementation details or token-bearing input.
+  try {
+    parsedUrl = new URL(feedUrl.trim())
+  } catch {
+    throw new Error('Feed URLs must start with http:// or https://.')
+  }
+
   if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
     throw new Error('Feed URLs must start with http:// or https://.')
   }

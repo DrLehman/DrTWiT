@@ -37,7 +37,11 @@ export function AddFeedForm({ onAddFeed }: AddFeedFormProps) {
   }
 
   return (
-    <form className="add-feed-form" onSubmit={handleSubmit}>
+    // Browser-native URL validation blocks submit before React can run, which
+    // produces a silent failure in this compact sidebar form. The app owns feed
+    // validation through createCustomFeed so every invalid value gets the same
+    // visible, token-safe error copy regardless of browser or Electron shell.
+    <form className="add-feed-form" onSubmit={handleSubmit} noValidate>
       <div className="form-heading">Private RSS feed</div>
       <label>
         <span>Feed name</span>

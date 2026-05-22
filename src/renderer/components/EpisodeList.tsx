@@ -6,9 +6,10 @@ interface EpisodeListProps {
   isLoading: boolean
   error: string | null
   onSelectEpisode: (episode: Episode) => void
+  onDownloadEpisode: (episode: Episode, mediaKind: 'audio' | 'video') => void
 }
 
-export function EpisodeList({ episodes, selectedEpisode, isLoading, error, onSelectEpisode }: EpisodeListProps) {
+export function EpisodeList({ episodes, selectedEpisode, isLoading, error, onSelectEpisode, onDownloadEpisode }: EpisodeListProps) {
   if (isLoading) {
     return (
       <div className="empty-state">
@@ -61,8 +62,22 @@ export function EpisodeList({ episodes, selectedEpisode, isLoading, error, onSel
             <span className="episode-date">{formatDate(episode.pubDate)}</span>
             <span className="episode-duration">{episode.duration || '—'}</span>
             <span className="episode-media">
-              {episode.videoUrl ? '▭' : ''}
-              {episode.audioUrl ? '◖' : ''}
+              {episode.audioUrl && (
+                <button type="button" aria-label={`Download audio for ${episode.title}`} onClick={event => {
+                  event.stopPropagation()
+                  onDownloadEpisode(episode, 'audio')
+                }}>
+                  Audio
+                </button>
+              )}
+              {episode.videoUrl && (
+                <button type="button" aria-label={`Download video for ${episode.title}`} onClick={event => {
+                  event.stopPropagation()
+                  onDownloadEpisode(episode, 'video')
+                }}>
+                  Video
+                </button>
+              )}
             </span>
           </button>
         ))}

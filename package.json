@@ -4,8 +4,9 @@
   "description": "Electron desktop app for TWiT (This Week in Tech) podcast network",
   "main": "dist/main/main/main.js",
   "scripts": {
-    "dev": "concurrently \"npm run dev:vite\" \"npm run dev:main\" \"npm run dev:electron\"",
+    "dev": "npm run dev:vite",
     "dev:vite": "vite",
+    "dev:desktop": "concurrently \"npm run dev:vite\" \"npm run dev:main\" \"npm run dev:electron\"",
     "dev:main": "tsc -p tsconfig.main.json --watch --preserveWatchOutput",
     "dev:electron": "wait-on http://localhost:5173 dist/main/main/main.js dist/main/preload/preload.js && electron .",
     "build": "tsc && vite build",

@@ -1,11 +1,17 @@
 import { AddFeedForm } from './AddFeedForm'
 import type { CustomFeedSource, FeedSource } from '../types'
 
+export type AppView = 'shows' | 'queue' | 'downloads' | 'settings'
+
 interface SidebarProps {
   sources: FeedSource[]
   customFeeds: CustomFeedSource[]
   selectedSourceId: string | null
   lastUpdatedLabel: string
+  activeView: AppView
+  queueCount: number
+  downloadCount: number
+  onSelectView: (view: AppView) => void
   onSelectSource: (source: FeedSource) => void
   onAddFeed: (feed: CustomFeedSource) => void
   onRemoveFeed: (feedId: string) => void
@@ -16,6 +22,10 @@ export function Sidebar({
   customFeeds,
   selectedSourceId,
   lastUpdatedLabel,
+  activeView,
+  queueCount,
+  downloadCount,
+  onSelectView,
   onSelectSource,
   onAddFeed,
   onRemoveFeed,
@@ -25,41 +35,30 @@ export function Sidebar({
   // while custom feeds may contain tokenized URLs and need remove controls.
   return (
     <aside className="sidebar">
-      <div className="window-dots" aria-hidden="true">
-        <span />
-        <span />
-        <span />
-      </div>
-
       <div className="brand-lockup">
         <div className="brand-word">
           <span>Dr</span>TWiT
         </div>
-        <div className="brand-signal" aria-hidden="true">mic</div>
       </div>
 
       <nav className="primary-nav" aria-label="Primary">
-        <button className="nav-item active" type="button">
+        <button className={`nav-item ${activeView === 'shows' ? 'active' : ''}`} type="button" onClick={() => onSelectView('shows')}>
           <span className="nav-icon">▦</span>
           Shows
         </button>
-        <button className="nav-item" type="button">
+        <button className={`nav-item ${activeView === 'queue' ? 'active' : ''}`} type="button" onClick={() => onSelectView('queue')}>
           <span className="nav-icon">☰</span>
           Queue
-          <span className="nav-count">0</span>
+          <span className="nav-count">{queueCount}</span>
         </button>
-        <button className="nav-item" type="button">
+        <button className={`nav-item ${activeView === 'downloads' ? 'active' : ''}`} type="button" onClick={() => onSelectView('downloads')}>
           <span className="nav-icon">↓</span>
           Downloads
-          <span className="nav-count">0</span>
-        </button>
-        <button className="nav-item" type="button">
-          <span className="nav-icon">⚙</span>
-          Settings
+          <span className="nav-count">{downloadCount}</span>
         </button>
       </nav>
 
-      <div className="source-section">
+      <div className="source-section shows-section">
         <div className="section-label">Shows</div>
         <div className="source-list">
           {sources.map(source => (
@@ -67,9 +66,14 @@ export function Sidebar({
               className={`source-row ${selectedSourceId === source.id ? 'selected' : ''}`}
               key={source.id}
               type="button"
-              onClick={() => onSelectSource(source)}
+              onClick={() => {
+                onSelectView('shows')
+                onSelectSource(source)
+              }}
             >
-              <span className="source-art">{source.name.slice(0, 2).toUpperCase()}</span>
+              <span className="source-art">
+                {source.artworkUrl ? <img src={source.artworkUrl} alt="" /> : source.name.slice(0, 2).toUpperCase()}
+              </span>
               <span className="source-name">{source.name}</span>
             </button>
           ))}
@@ -87,9 +91,14 @@ export function Sidebar({
                 <button
                   className={`source-row custom ${selectedSourceId === feed.id ? 'selected' : ''}`}
                   type="button"
-                  onClick={() => onSelectSource(feed)}
+                  onClick={() => {
+                    onSelectView('shows')
+                    onSelectSource(feed)
+                  }}
                 >
-                  <span className="source-art private">RSS</span>
+                  <span className="source-art private">
+                    {feed.artworkUrl ? <img src={feed.artworkUrl} alt="" /> : 'RSS'}
+                  </span>
                   <span className="source-name">{feed.name}</span>
                 </button>
                 <button
@@ -107,12 +116,18 @@ export function Sidebar({
         <AddFeedForm onAddFeed={onAddFeed} />
       </div>
 
-      <div className="sync-card">
-        <div>
-          <span className="status-dot" />
-          RSS updated
+      <div className="sidebar-footer">
+        <button className={`nav-item settings-button ${activeView === 'settings' ? 'active' : ''}`} type="button" onClick={() => onSelectView('settings')}>
+          <span className="nav-icon">⚙</span>
+          Settings
+        </button>
+        <div className="sync-card">
+          <div>
+            <span className="status-dot" />
+            RSS updated
+          </div>
+          <strong>{lastUpdatedLabel}</strong>
         </div>
-        <strong>{lastUpdatedLabel}</strong>
       </div>
     </aside>
   )

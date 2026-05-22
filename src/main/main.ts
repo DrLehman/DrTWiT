@@ -1,12 +1,19 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron'
+import * as fs from 'fs/promises'
 import * as path from 'path'
 import Parser from 'rss-parser'
-import type { Episode, FeedRequest, FeedResult, FeedSource, FeedSourceKind } from '../shared/types'
-
-type TwitFeedDefinition = FeedSource & {
-  kind: 'builtin'
-  feedUrl: string
-}
+import { BUILT_IN_SOURCES } from '../shared/catalog'
+import type {
+  DownloadItem,
+  DownloadRequest,
+  DownloadSettings,
+  Episode,
+  FeedRequest,
+  FeedResult,
+  FeedSource,
+  FeedSourceKind,
+  SubscriptionSettings,
+} from '../shared/types'
 
 type RssFeedExtensions = {
   'itunes:image'?: { href?: string }
@@ -38,67 +45,17 @@ const parser: Parser<RssFeedExtensions, RssItemExtensions> = new Parser({
 } as unknown as ConstructorParameters<typeof Parser<RssFeedExtensions, RssItemExtensions>>[0])
 
 let mainWindow: BrowserWindow | null = null
+let miniPlayerWindow: BrowserWindow | null = null
+const downloadItems = new Map<string, DownloadItem>()
+let downloadSettings: DownloadSettings = {
+  downloadDirectory: null,
+  maxEpisodes: 25,
+  maxDiskMegabytes: 2048,
+  deleteAfterListen: false,
+}
+let subscriptions: SubscriptionSettings[] = []
 
 const isDev = process.env.NODE_ENV !== 'production' || !app.isPackaged
-
-const BUILT_IN_SOURCES: TwitFeedDefinition[] = [
-  {
-    id: 'twit',
-    kind: 'builtin',
-    name: 'This Week in Tech',
-    description: 'Leo Laporte and guests cover the week in technology.',
-    feedUrl: 'https://feeds.twit.tv/twit.xml',
-  },
-  {
-    id: 'sn',
-    kind: 'builtin',
-    name: 'Security Now',
-    description: 'Deep security analysis and practical computing risk context.',
-    feedUrl: 'https://feeds.twit.tv/sn.xml',
-  },
-  {
-    id: 'ww',
-    kind: 'builtin',
-    name: 'Windows Weekly',
-    description: 'Microsoft, Windows, Surface, Xbox, and developer ecosystem news.',
-    feedUrl: 'https://feeds.twit.tv/ww.xml',
-  },
-  {
-    id: 'mbw',
-    kind: 'builtin',
-    name: 'MacBreak Weekly',
-    description: 'Apple news, hardware, software, and culture coverage.',
-    feedUrl: 'https://feeds.twit.tv/mbw.xml',
-  },
-  {
-    id: 'twig',
-    kind: 'builtin',
-    name: 'This Week in Google',
-    description: 'Google, AI, cloud, policy, and web platform conversation.',
-    feedUrl: 'https://feeds.twit.tv/twig.xml',
-  },
-  {
-    id: 'floss',
-    kind: 'builtin',
-    name: 'FLOSS Weekly',
-    description: 'Open source projects, maintainers, and software communities.',
-    feedUrl: 'https://feeds.twit.tv/floss.xml',
-  },
-  {
-    id: 'hot',
-    kind: 'builtin',
-    name: 'Hands-On Tech',
-    description: 'Practical answers for devices, software, and everyday tech.',
-    feedUrl: 'https://feeds.twit.tv/hot.xml',
-  },
-  {
-    id: 'tnw',
-    kind: 'builtin',
-    name: 'Tech News Weekly',
-    description: 'A sharper weekly look at the most important technology stories.',
-    feedUrl: 'https://feeds.twit.tv/tnw.xml',
-  },
-]
 
 // Electron owns all remote RSS loading instead of letting the renderer fetch
 // feeds directly. That keeps CORS, tokenized private URLs, and parser-specific
@@ -142,6 +99,44 @@ function createWindow(): void {
   })
 }
 
+function createMiniPlayerWindow(): void {
+  if (miniPlayerWindow) {
+    miniPlayerWindow.focus()
+    return
+  }
+
+  miniPlayerWindow = new BrowserWindow({
+    width: 420,
+    height: 220,
+    minWidth: 360,
+    minHeight: 180,
+    parent: mainWindow ?? undefined,
+    webPreferences: {
+      preload: path.join(__dirname, '../preload/preload.js'),
+      contextIsolation: true,
+      nodeIntegration: false,
+      sandbox: true,
+    },
+    title: 'DrTWiT Mini Player',
+    backgroundColor: '#0b0d10',
+    show: false,
+  })
+
+  miniPlayerWindow.once('ready-to-show', () => {
+    miniPlayerWindow?.show()
+  })
+
+  if (isDev) {
+    miniPlayerWindow.loadURL('http://localhost:5173?popout=player')
+  } else {
+    miniPlayerWindow.loadFile(path.join(__dirname, '../../renderer/index.html'), { query: { popout: 'player' } })
+  }
+
+  miniPlayerWindow.on('closed', () => {
+    miniPlayerWindow = null
+  })
+}
+
 // Private/member RSS URLs can include bearer-like tokens in the query string or
 // path. Errors returned to the renderer are therefore intentionally generic: the
 // UI gets an actionable message, but neither the renderer state nor screenshots
@@ -176,9 +171,55 @@ function validateCustomFeedUrl(feedUrl: string | undefined): string {
   return parsed.toString()
 }
 
+function validateHttpUrl(url: string | undefined, label: string): string {
+  if (!url) {
+    throw new Error(`${label} is required.`)
+  }
+
+  const parsed = new URL(url)
+  if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+    throw new Error(`${label} must begin with http:// or https://.`)
+  }
+
+  return parsed.toString()
+}
+
+function stripHtml(value: string): string {
+  return value
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/&nbsp;/g, ' ')
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function getDownloadRoot(): string {
+  return downloadSettings.downloadDirectory ?? path.join(app.getPath('userData'), 'Downloads')
+}
+
+function safeFileName(value: string, extension: string): string {
+  const baseName = value.replace(/[^\w.-]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 90) || 'episode'
+  return `${baseName}.${extension}`
+}
+
+function getDownloadItem(id: string): DownloadItem {
+  const item = downloadItems.get(id)
+  if (!item) {
+    throw new Error('The requested download was not found.')
+  }
+  return item
+}
+
 // Built-in feeds are resolved by id so the renderer does not need to know their
-// canonical URLs. Custom feeds carry a local URL because that is user data
-// entered on this machine and persisted only in renderer localStorage.
+// canonical URLs. The media preference selects the matching public TWiT feed:
+// audio RSS for podcast playback, or HD video RSS for the video list. Custom
+// feeds carry a local URL because that is user data entered on this machine and
+// persisted only in renderer localStorage; for custom feeds the entered URL is
+// authoritative and may contain either audio or video enclosures.
 function resolveFeedRequest(request: FeedRequest): {
   sourceId: string
   sourceKind: FeedSourceKind
@@ -192,7 +233,7 @@ function resolveFeedRequest(request: FeedRequest): {
     return {
       sourceId: builtInSource.id,
       sourceKind: 'builtin',
-      feedUrl: builtInSource.feedUrl,
+      feedUrl: request.mediaPreference === 'video' ? builtInSource.videoFeedUrl : builtInSource.feedUrl,
     }
   }
 
@@ -210,6 +251,15 @@ function firstText(...values: Array<string | undefined | null>): string {
   return values.find(value => typeof value === 'string' && value.trim().length > 0)?.trim() ?? ''
 }
 
+// Some TWiT video RSS entries are published with an explicit `0:00` duration
+// while the MP4 enclosure itself is valid. Treating that as real metadata makes
+// the episode table look broken, so zero-like RSS duration values are displayed
+// as unknown until the media element can report its runtime during playback.
+function normalizeEpisodeDuration(value: string | undefined | null): string {
+  const duration = firstText(value)
+  return /^(?:0+:)?0+:00$/.test(duration) ? '' : duration
+}
+
 // Episode mapping translates many RSS dialects into one renderer contract. The
 // chosen fields deliberately favor visible UI stability: every episode gets an
 // id, a title, a description, a thumbnail fallback, and explicit nullable media
@@ -223,7 +273,7 @@ function mapEpisode(item: Parser.Item & RssItemExtensions, feedImage: string | n
     title: firstText(item.title, 'Untitled episode'),
     description: firstText(item.summary, item.contentSnippet, item.content, 'No description was provided.'),
     pubDate: firstText(item.pubDate, item.isoDate),
-    duration: firstText(item.duration),
+    duration: normalizeEpisodeDuration(item.duration),
     thumbnail: item.mediaThumbnail?.url ?? item.itunesImage?.href ?? feedImage,
     audioUrl: media.audioUrl,
     videoUrl: media.videoUrl,
@@ -266,7 +316,14 @@ function getMediaUrls(item: Parser.Item & RssItemExtensions): Pick<Episode, 'aud
 }
 
 ipcMain.handle('get-built-in-sources', async (): Promise<FeedSource[]> => {
-  return BUILT_IN_SOURCES.map(({ id, kind, name, description }) => ({ id, kind, name, description }))
+  return BUILT_IN_SOURCES.map(({ id, kind, name, description, hasVideo, artworkUrl }) => ({
+    id,
+    kind,
+    name,
+    description,
+    hasVideo,
+    artworkUrl,
+  }))
 })
 
 ipcMain.handle('get-feed', async (_event, request: FeedRequest): Promise<FeedResult> => {
@@ -289,6 +346,123 @@ ipcMain.handle('get-feed', async (_event, request: FeedRequest): Promise<FeedRes
     console.error('Feed load failed:', error instanceof Error ? error.message : 'Unknown feed error')
     throw sanitizeRemoteError(error)
   }
+})
+
+ipcMain.handle('get-episode-page-text', async (_event, url: string): Promise<string> => {
+  const safeUrl = validateHttpUrl(url, 'Episode page URL')
+  const response = await fetch(safeUrl)
+  if (!response.ok) {
+    throw new Error('The episode page could not be loaded.')
+  }
+  return stripHtml(await response.text()).slice(0, 120000)
+})
+
+ipcMain.handle('get-downloads', async (): Promise<DownloadItem[]> => {
+  return Array.from(downloadItems.values())
+})
+
+ipcMain.handle('download-episode', async (_event, request: DownloadRequest): Promise<DownloadItem> => {
+  const mediaUrl = validateHttpUrl(
+    request.mediaKind === 'video' ? request.episode.videoUrl ?? undefined : request.episode.audioUrl ?? undefined,
+    'Episode media URL',
+  )
+  const id = `${request.episode.guid}-${request.mediaKind}`
+  const extension = request.mediaKind === 'video' ? 'mp4' : 'mp3'
+  const downloadRoot = getDownloadRoot()
+  const fileName = safeFileName(request.episode.title, extension)
+  const filePath = path.join(downloadRoot, fileName)
+  const startedAt = new Date().toISOString()
+  const queuedItem: DownloadItem = {
+    id,
+    episodeGuid: request.episode.guid,
+    sourceId: request.sourceId,
+    sourceName: request.sourceName,
+    title: request.episode.title,
+    mediaKind: request.mediaKind,
+    mediaUrl,
+    fileName,
+    filePath,
+    status: 'downloading',
+    progress: 0,
+    error: null,
+    createdAt: startedAt,
+    completedAt: null,
+    listenedAt: null,
+  }
+  downloadItems.set(id, queuedItem)
+
+  try {
+    await fs.mkdir(downloadRoot, { recursive: true })
+    const response = await fetch(mediaUrl)
+    if (!response.ok || !response.arrayBuffer) {
+      throw new Error('The media file could not be downloaded.')
+    }
+    await fs.writeFile(filePath, Buffer.from(await response.arrayBuffer()))
+    const completedItem = {
+      ...queuedItem,
+      status: 'available' as const,
+      progress: 1,
+      completedAt: new Date().toISOString(),
+    }
+    downloadItems.set(id, completedItem)
+    return completedItem
+  } catch (error) {
+    const failedItem = {
+      ...queuedItem,
+      status: 'failed' as const,
+      error: error instanceof Error ? error.message : 'The media file could not be downloaded.',
+    }
+    downloadItems.set(id, failedItem)
+    return failedItem
+  }
+})
+
+ipcMain.handle('delete-download', async (_event, id: string): Promise<DownloadItem[]> => {
+  const item = getDownloadItem(id)
+  if (item.filePath) {
+    await fs.rm(item.filePath, { force: true })
+  }
+  downloadItems.delete(id)
+  return Array.from(downloadItems.values())
+})
+
+ipcMain.handle('mark-download-listened', async (_event, id: string): Promise<DownloadItem[]> => {
+  const item = getDownloadItem(id)
+  const listenedItem = { ...item, status: 'listened' as const, listenedAt: new Date().toISOString() }
+  downloadItems.set(id, listenedItem)
+  if (downloadSettings.deleteAfterListen && listenedItem.filePath) {
+    await fs.rm(listenedItem.filePath, { force: true })
+    downloadItems.delete(id)
+  }
+  return Array.from(downloadItems.values())
+})
+
+ipcMain.handle('reveal-download', async (_event, id: string): Promise<void> => {
+  const item = getDownloadItem(id)
+  if (item.filePath) {
+    shell.showItemInFolder(item.filePath)
+  }
+})
+
+ipcMain.handle('get-download-settings', async (): Promise<DownloadSettings> => downloadSettings)
+
+ipcMain.handle('save-download-settings', async (_event, settings: DownloadSettings): Promise<DownloadSettings> => {
+  downloadSettings = settings
+  return downloadSettings
+})
+
+ipcMain.handle('get-subscriptions', async (): Promise<SubscriptionSettings[]> => subscriptions)
+
+ipcMain.handle('save-subscription', async (_event, settings: SubscriptionSettings): Promise<SubscriptionSettings[]> => {
+  subscriptions = [
+    ...subscriptions.filter(subscription => subscription.sourceId !== settings.sourceId),
+    settings,
+  ]
+  return subscriptions
+})
+
+ipcMain.handle('open-mini-player', async (): Promise<void> => {
+  createMiniPlayerWindow()
 })
 
 app.whenReady().then(() => {

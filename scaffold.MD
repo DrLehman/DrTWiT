@@ -232,15 +232,176 @@ Non-authoritative data handling:
   - Read README for command accuracy against `package.json`.
   - Update README whenever command names or release status changes.
 - Evidence: README was updated to describe local npm development only and to remove production build/package claims for this phase.
+- Evidence: README was expanded with macOS and Windows self-build instructions, exact package commands, troubleshooting notes, and copy-paste guidance for Claude Code/OpenAI Codex agents.
 
 #### Shard S6.1: Rewrite README
 
-- Scope: replace origin-story README with release-facing project overview and developer setup.
+- Scope: replace origin-story README with release-facing project overview, developer setup, and platform build instructions.
 - Dependencies: `package.json`, current app features.
-- Status: completed in prep pass.
+- Status: completed and updated.
 - Contract: README is user-facing first and uses the existing script names.
 - Failure conditions: stale origin story remains, unsupported claims of release stability, or missing setup commands.
 - Tests: compare commands in README to `package.json`.
+
+#### Shard S6.2: Add self-build instructions
+
+- Scope: document exact local build/package steps for macOS and Windows, including tool installation, cloning from GitHub, dependency install, typecheck, package output location, and unsigned-app warnings.
+- Dependencies: `package.json` scripts, current repository URL, Electron Builder configuration.
+- Status: completed.
+- Contract: a user or AI coding agent can follow README steps to install tools, clone `https://github.com/DrLehman/DrTWiT.git`, run checks, and create local packages for their platform.
+- Failure conditions: README references missing scripts, omits `npm ci`, hides OS signing warnings, or suggests production release verification that has not happened.
+- Tests: command-name check against `package.json`; `git diff --check -- README.md`.
+
+### Shell S7: UI Layout and Branding
+
+- Objective: align the redesigned interface with the user's current visual direction: show/feed branding uses real images, the hero keeps show artwork, and video renders as its own large player above the hero only in video mode.
+- Dependencies: renderer component structure, shared feed/source types, built-in TWiT source catalog, loaded feed image metadata, browser QA.
+- Interactions: `ShowHeader` owns the show artwork hero; `Sidebar` owns source branding; the top video player belongs above the hero; playback state from Shell S4 must remain independent enough to avoid accidental playback starts.
+- Status: active.
+- Contracts:
+  - In audio mode, the hero media slot shows the current show/feed logo or artwork.
+  - In video mode, the video player appears above the hero/header section.
+  - The hero artwork remains visible in both audio and video modes.
+  - The top video block is hidden when Audio mode is selected.
+  - The separate large video block below header/actions is removed.
+  - Built-in sidebar source rows show real show logo/branding images instead of initials.
+  - Local/private feed rows show feed-provided branding after that feed has loaded, with RSS fallback only while no image is known.
+  - Episode media indicators are clear audio/video availability markers, not ambiguous square or half-circle glyphs.
+- Tests:
+  - Browser QA at `http://localhost:5173/` confirms audio mode has hero art and no top or below-header video block.
+  - Browser QA confirms video mode has the video player above the hero, hero artwork still present, and no duplicate video region below the controls.
+  - Browser QA confirms sidebar built-in shows and loaded local feeds render logo images.
+  - Narrow viewport QA around `1049x862` confirms header actions, media slot, mode toggle, and list columns do not overlap.
+
+#### Shard S7.1: Move video above the hero
+
+- Scope: move video rendering above the hero/header section and remove the below-header `video-stage` placement.
+- Dependencies: current playback state separation between browsing mode and player mode.
+- Status: completed.
+- Contract: Video mode displays one top video player above the hero; Audio mode hides the top video player; the hero always retains show artwork.
+- Failure conditions: video replaces hero artwork, video appears below header/actions, video remains visible in Audio mode, or audio mode loses show artwork.
+- Tests: audio-to-video and video-to-audio browser playback persistence smoke tests.
+- Evidence: Browser QA on 2026-05-22 confirmed Video mode `topVideoCount=1` with hero image present and Audio mode `topVideoCount=0` with hero image present; no console errors.
+
+#### Shard S7.2: Add real feed branding images
+
+- Scope: extend source/feed display data so built-in shows and local feeds can render logo images in the sidebar and hero.
+- Dependencies: shared source catalog, feed image metadata, custom feed local state.
+- Status: completed for built-in sources; active for custom feed image adoption.
+- Contract: built-in source rows have static logo art; custom feed rows adopt `FeedResult.image` after the feed loads.
+- Failure conditions: initials remain for built-in shows, loaded custom feeds keep RSS tiles despite having images, or private feed URLs are exposed while deriving labels/art.
+- Tests: source list visual QA before and after loading built-in and custom feeds.
+- Evidence: Browser QA on 2026-05-22 confirmed current built-in source rows render 13 show images and no stale `FLOSS Weekly` entry.
+
+#### Shard S7.3: Verify current TWiT show catalog
+
+- Scope: keep built-in sources aligned with TWiT's current public show list and available public RSS feeds.
+- Dependencies: `https://twit.tv/shows`, `https://feeds.twit.tv/*.xml`, shared catalog.
+- Status: completed for current RSS-backed public list.
+- Contract: built-in list includes current public RSS-backed shows, renames `This Week in Google` to `Intelligent Machines`, removes inactive/archive-only `FLOSS Weekly`, and does not add shows with unknown/broken public RSS feeds.
+- Failure conditions: stale show names remain, retired shows appear as active built-ins, or a listed source has no working audio/video feed.
+- Tests: verify show names against `https://twit.tv/shows`; verify RSS and HD video feed URLs for added sources; browser reload source-list QA.
+- Evidence: 2026-05-22 verification added `iOS Today`, `This Week in Space`, `Home Theater Geeks`, `Hands-On Apple`, `Hands-On Windows`, and `Untitled Linux Show`; `AI Inside` was not added because no public RSS feed was found.
+
+### Shell S8: Search
+
+- Objective: replace the current local title/description filter with useful search ordered by show/source name, episode title, then episode-page transcript/content.
+- Dependencies: feed catalog, loaded feed results, trusted main-process network boundary for episode-page fetches, renderer search UI.
+- Interactions: search should cooperate with feed loading, source selection, episode list rendering, and privacy rules for custom/private feeds.
+- Status: active.
+- Contracts:
+  - Search priority is show/source name first, episode title second, episode-page transcript/content third.
+  - Episode-page transcript/content fetching happens behind the trusted Electron/main-process boundary, not by exposing private URLs or parser details directly in renderer code.
+  - Results make the match type clear enough for the user to understand why an item appeared.
+  - Search errors do not crash the app and do not reveal tokenized private/member feed URLs.
+- Tests:
+  - Search by show name selects or surfaces the matching show before episode-title matches.
+  - Search by episode title surfaces matching episodes from the current or discovered feed set.
+  - Search by term found only on an episode page/transcript surfaces the relevant episode after page content is fetched.
+  - Invalid or unavailable transcript pages show a non-fatal search miss/error state.
+
+#### Shard S8.1: Search current catalog and feed metadata
+
+- Scope: implement show/source-name and episode-title search before transcript expansion.
+- Dependencies: `FeedSource[]`, loaded `FeedResult`, renderer search state.
+- Status: pending.
+- Contract: search no longer appears broken when a query does not match the currently selected episode descriptions only.
+- Failure conditions: search silently filters everything while a show-name match exists, or search only checks episode descriptions.
+- Tests: queries for known show names, known episode titles, and no-match terms.
+
+#### Shard S8.2: Fetch and search episode-page transcript/content
+
+- Scope: fetch linked episode pages or transcript-like page content via the main process and index enough text to satisfy transcript/content search.
+- Dependencies: episode `link`, Electron IPC, sanitized network errors, cache policy.
+- Status: pending.
+- Contract: transcript/page search extends results without logging full private URLs or blocking normal feed browsing.
+- Failure conditions: renderer fetches arbitrary episode pages directly, tokenized URLs appear in errors, or transcript fetch failures break feed search.
+- Tests: transcript-only query, failed page fetch, custom/private feed with redacted errors.
+
+### Shell S9: Mini Player Pop-Out
+
+- Objective: replace the current CSS-only mini state with a true Electron child-window pop-out for the active player.
+- Dependencies: Electron `BrowserWindow`, preload IPC, shared playback state model, renderer player controls.
+- Interactions: browser-only dev can expose the control, but final pop-out acceptance requires Electron runtime QA because the target behavior is desktop-window specific.
+- Status: active.
+- Contracts:
+  - Mini opens an Electron child window instead of merely shrinking the footer with CSS.
+  - The pop-out shares the current playback session and can dock back without restarting playback.
+  - Pop-out controls can play/pause/seek/skip and reflect the same active episode/media mode as the main window.
+  - Closing the pop-out returns control cleanly to the main window without losing playback state.
+- Tests:
+  - Browser QA confirms controls and fallback visual state remain present without Electron.
+  - Electron QA confirms child window creation, dock-back behavior, shared controls, and no playback restart.
+  - Electron QA confirms window close, main-window close, and app quit paths clean up safely.
+- Evidence: Electron child-window IPC and renderer control path were implemented and typechecked; runtime acceptance remains pending because Electron was not launched during browser-focused UI work.
+
+#### Shard S9.1: Define shared player state boundary
+
+- Scope: determine how the main window and pop-out window share active episode, mode, time, duration, volume, and play/pause state.
+- Dependencies: existing renderer player state and Electron IPC.
+- Status: pending.
+- Contract: one authoritative playback session exists; pop-out is not an independent duplicate player that drifts out of sync.
+- Failure conditions: two media elements play simultaneously unintentionally, dock-back restarts media, or the pop-out loses selected episode context.
+- Tests: pop out during audio playback, pop out during video playback, dock back, close pop-out.
+
+### Shell S10: Offline Downloads and Subscriptions
+
+- Objective: make Downloads a real offline library with per-episode downloads, feed subscriptions, retention controls, and OS file access/sharing.
+- Dependencies: Electron main process filesystem access, app data path, IPC contracts, download queue, feed refresh, playback state, settings UI.
+- Interactions: episode rows expose download actions; show/feed pages expose subscription settings; Settings owns global storage and retention; Downloads view lists local files and job state.
+- Status: planned.
+- Contracts:
+  - Downloads view shows queued, downloading, available, failed, and listened states.
+  - Each episode row exposes download actions for available audio/video media.
+  - Show/feed subscription settings support audio, video, or both.
+  - Download storage defaults to a managed Electron app-data `Downloads` folder and is editable in Settings.
+  - Retention enforces both maximum episode count and maximum disk space by deleting oldest eligible downloads until both limits are satisfied.
+  - Delete-after-listen runs after playback completion/listened state, and manual "mark listened" is also available.
+  - Every downloaded episode supports offline play, show in folder, share/open file through OS capabilities, delete local file, and retry failed download.
+- Tests:
+  - Electron QA confirms manual audio download, manual video download, failed download retry, offline playback, delete local file, show in folder, and share/open file.
+  - Electron QA confirms subscription refresh downloads new episodes according to audio/video/both settings.
+  - Electron QA confirms retention cleanup for count cap, disk cap, and both caps together.
+  - Electron QA confirms delete-after-listen and manual mark-listened cleanup.
+- Evidence: Browser QA confirmed download buttons, subscription controls, Downloads view, and preview download item creation; real filesystem actions remain pending Electron QA.
+
+#### Shard S10.1: Download storage and IPC contract
+
+- Scope: define and implement managed download paths, download metadata, progress reporting, file deletion, show-in-folder, and share/open actions.
+- Dependencies: Electron `app.getPath`, `shell.showItemInFolder`, safe filesystem paths, renderer IPC API.
+- Status: pending.
+- Contract: renderer never writes arbitrary files directly; main process validates paths and owns filesystem side effects.
+- Failure conditions: path traversal, unmanaged files outside the selected download root, missing progress/error reporting, or inability to locate a downloaded file on disk.
+- Tests: path validation, download success, show-in-folder, share/open, delete, retry.
+
+#### Shard S10.2: Subscription rules and retention
+
+- Scope: add per-feed subscription settings, automatic new-episode checks, media-type selection, and retention cleanup.
+- Dependencies: feed refresh logic, download queue, settings persistence, playback listened state.
+- Status: pending.
+- Contract: subscriptions download only selected media types and cleanup respects both count and disk-space limits.
+- Failure conditions: duplicate downloads, cleanup deletes active playback unexpectedly, count and disk caps conflict without deterministic resolution, or private feed URLs leak in logs/errors.
+- Tests: subscribe audio-only, video-only, both; simulate new episode; enforce caps; protect currently playing file.
 
 ## Ambiguities and Open Questions
 
@@ -249,6 +410,10 @@ Non-authoritative data handling:
 - Membership feed support for v1 means user-entered tokenized RSS URLs only. Username/password authentication and Keychain storage are out of scope until explicitly prioritized.
 - Live TWiT RSS item media shapes should be verified before changing playback logic.
 - Browser QA uses a deterministic preview API when loading the Vite app outside Electron; Electron IPC remains the real RSS path for the desktop app.
+- True mini-player pop-out and download filesystem behavior cannot be fully accepted in browser-only QA; they require Electron QA without running production build/package commands.
+- Episode-page transcript/content search needs a conservative page-fetch/cache strategy so it is useful without making search feel slow or leaking private feed details.
+- `AI Inside` appears on TWiT's public shows page, but no public RSS URL was found during 2026-05-22 verification. It should stay out of the built-in RSS-backed sidebar until a working feed URL is identified.
+- Browser plugin text entry hit a virtual clipboard failure during search QA; search compiled and app loaded cleanly, but typed search interaction still needs manual or alternate automation verification.
 
 ## Decisions and Rationales
 
@@ -260,6 +425,15 @@ Non-authoritative data handling:
 - 2026-05-21: Use repo-local DrLehman git identity and DrLehman origin only for this project; do not change global NewCoffee identity.
 - 2026-05-21: Store private/member feed URLs in localStorage for v1 because the user chose local app storage and no username/password auth.
 - 2026-05-21: Local testing phase excludes production build and package commands; development transpilation for Electron main/preload is allowed only to run the local app.
+- 2026-05-22: Video belongs in the hero media slot in video mode; the separate below-header video block should be removed.
+- 2026-05-22: User corrected the video placement: the show logo/artwork must remain in the hero, while the video player belongs above the hero and must hide when Audio mode is selected.
+- 2026-05-22: Sidebar source tiles should use real show/feed branding images instead of initials or permanent RSS placeholders.
+- 2026-05-22: Built-in shows should track the current public TWiT show list where working public RSS feeds exist; stale/archive shows should not appear as active built-ins.
+- 2026-05-22: Search priority is show/source name, then episode title, then episode-page transcript/content.
+- 2026-05-22: Mini player means a true Electron child-window pop-out, not a CSS-only compact footer.
+- 2026-05-22: Download storage defaults to managed Electron app data under a `Downloads` folder, with a user-editable location in Settings.
+- 2026-05-22: Download retention enforces both configured episode-count and disk-space caps; delete-after-listen is based on playback completion/listened state and also supports manual mark-listened cleanup.
+- 2026-05-22: README should include explicit macOS and Windows self-build instructions plus agent-friendly prompts for Claude Code/OpenAI Codex.
 
 ## Lessons Learned and Process Improvements
 
@@ -267,6 +441,10 @@ Non-authoritative data handling:
 - Public README content and internal agent/project governance should stay separate: README for users and developers, `scaffold.MD` for roadmap, contracts, decisions, and evidence.
 - Dependency verification must start with local runtime availability before interpreting build or typecheck failures.
 - Private RSS feed URLs should be treated as sensitive even when the app needs to store the complete URL locally for member-feed access.
+- Browser QA is appropriate for layout, search UI, and non-filesystem controls, but Electron QA is required for child windows and managed local file operations.
+- Downloads and transcript search should stay behind trusted main-process boundaries because they involve network and filesystem side effects.
+- Current-show catalog updates should verify both the TWiT shows page and the actual RSS feed URLs; page presence alone is not enough if no feed is exposed.
+- User language around placement is literal: "above the hero" means a separate region above the hero, not replacing the hero image.
 
 ## MCP / Tool Usage Log
 
@@ -279,6 +457,10 @@ Non-authoritative data handling:
 - 2026-05-21: Shell inspection confirmed `https://github.com/DrLehman/DrTWiT.git` is reachable and points to the same HEAD as the prior remote.
 - 2026-05-21: Temporary official Node v20.11.1 under `/tmp/drtwit-node20` supplied local npm for `npm ci`, `npm run typecheck`, and `npm run dev`.
 - 2026-05-21: Browser plugin loaded `http://localhost:5173/`, captured desktop/mobile screenshots, verified no console errors, exercised search, custom feed form validation, custom feed addition, and playback state.
+- 2026-05-22: Shell inspection of renderer header, sidebar, player, search, main IPC, preload bridge, and package scripts grounded the plans for hero video placement, branding images, search, Electron pop-out, and downloads.
+- 2026-05-22: Web and RSS verification used `https://twit.tv/shows` plus `feeds.twit.tv` RSS/HD video endpoints to update current built-in show names and remove stale entries.
+- 2026-05-22: Browser plugin QA verified current show logos, video above hero, Audio mode hiding the video block, and no console errors.
+- 2026-05-22: Shell checks verified `npm run typecheck`, `git diff --check`, README command-name consistency, and scaffold diff hygiene after recent updates.
 
 ## Execution Log
 
@@ -288,3 +470,5 @@ Non-authoritative data handling:
 - 2026-05-21: Set repo-local git identity to `DrLehman <264849478+DrLehman@users.noreply.github.com>` and changed origin to `https://github.com/DrLehman/DrTWiT.git`.
 - 2026-05-21: Began full redesign implementation around Electron IPC feed loading, local custom feed storage, modular React renderer components, and the accepted broadcast-library visual concept.
 - 2026-05-21: Completed local npm implementation pass without running `npm run build`, `npm run package`, `npm run package:mac`, or any production packaging command.
+- 2026-05-22: Updated scaffold roadmap with planned Shells for UI layout/branding, ordered search with episode-page transcript/content fetching, Electron mini-player pop-out, and offline downloads/subscriptions.
+- 2026-05-22: Implemented visible redesign updates for current show branding, ordered search plumbing, download/subscription UI, Electron pop-out IPC, README self-build guide, and corrected video placement above the hero.

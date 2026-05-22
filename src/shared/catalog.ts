@@ -1,0 +1,145 @@
+import type { FeedSource } from './types'
+
+export type BuiltInFeedSource = FeedSource & {
+  kind: 'builtin'
+  feedUrl: string
+  videoFeedUrl: string
+}
+
+// The built-in catalog is shared by Electron and the Vite development server so
+// browser-based UI work and the real desktop app point at the same public RSS
+// feeds. Each TWiT show currently exposes a normal podcast audio RSS feed and a
+// parallel HD video RSS feed; storing both here keeps Audio/Video switching as a
+// data-source choice instead of a visual toggle that points at an empty mode.
+export const BUILT_IN_SOURCES: BuiltInFeedSource[] = [
+  {
+    id: 'twit',
+    kind: 'builtin',
+    name: 'This Week in Tech',
+    description: 'Leo Laporte and guests cover the week in technology.',
+    feedUrl: 'https://feeds.twit.tv/twit.xml',
+    videoFeedUrl: 'https://feeds.twit.tv/twit_video_hd.xml',
+    hasVideo: true,
+    artworkUrl: 'https://elroy.twit.tv/sites/default/files/styles/twit_album_art_2048x2048/public/images/shows/this_week_in_tech/album_art/audio/twit_2022albumart_standard_2048.jpg',
+  },
+  {
+    id: 'sn',
+    kind: 'builtin',
+    name: 'Security Now',
+    description: 'Deep security analysis and practical computing risk context.',
+    feedUrl: 'https://feeds.twit.tv/sn.xml',
+    videoFeedUrl: 'https://feeds.twit.tv/sn_video_hd.xml',
+    hasVideo: true,
+    artworkUrl: 'https://elroy.twit.tv/sites/default/files/styles/twit_album_art_2048x2048/public/images/shows/security_now/album_art/audio/sn2022_albumart_standard_2400.jpg',
+  },
+  {
+    id: 'mbw',
+    kind: 'builtin',
+    name: 'MacBreak Weekly',
+    description: 'Apple news, hardware, software, and culture coverage.',
+    feedUrl: 'https://feeds.twit.tv/mbw.xml',
+    videoFeedUrl: 'https://feeds.twit.tv/mbw_video_hd.xml',
+    hasVideo: true,
+    artworkUrl: 'https://elroy.twit.tv/sites/default/files/styles/twit_album_art_2048x2048/public/images/shows/macbreak_weekly/album_art/audio/mbw2022_albumart_standard_2400.jpg',
+  },
+  {
+    id: 'ww',
+    kind: 'builtin',
+    name: 'Windows Weekly',
+    description: 'Microsoft, Windows, Surface, Xbox, and developer ecosystem news.',
+    feedUrl: 'https://feeds.twit.tv/ww.xml',
+    videoFeedUrl: 'https://feeds.twit.tv/ww_video_hd.xml',
+    hasVideo: true,
+    artworkUrl: 'https://elroy.twit.tv/sites/default/files/styles/twit_album_art_2048x2048/public/images/shows/windows_weekly/album_art/audio/ww2022_albumart_standard_2400.jpg',
+  },
+  {
+    id: 'twig',
+    kind: 'builtin',
+    name: 'Intelligent Machines',
+    description: 'AI, machine learning, tech policy, and the systems reshaping computing.',
+    feedUrl: 'https://feeds.twit.tv/twig.xml',
+    videoFeedUrl: 'https://feeds.twit.tv/twig_video_hd.xml',
+    hasVideo: true,
+    artworkUrl: 'https://elroy.twit.tv/sites/default/files/styles/twit_album_art_2048x2048/public/images/shows/Intelligent%20Machines/album_art/audio/IM_albumart_standard_0.jpg',
+  },
+  {
+    id: 'tnw',
+    kind: 'builtin',
+    name: 'Tech News Weekly',
+    description: 'A sharper weekly look at the most important technology stories.',
+    feedUrl: 'https://feeds.twit.tv/tnw.xml',
+    videoFeedUrl: 'https://feeds.twit.tv/tnw_video_hd.xml',
+    hasVideo: true,
+    artworkUrl: 'https://elroy.twit.tv/sites/default/files/styles/twit_album_art_2048x2048/public/images/shows/tech_news_weekly/album_art/audio/tnw2022_albumart_standard_2400.jpg',
+  },
+  {
+    id: 'hot',
+    kind: 'builtin',
+    name: 'Hands-On Tech',
+    description: 'Practical answers for devices, software, and everyday tech.',
+    feedUrl: 'https://feeds.twit.tv/hot.xml',
+    videoFeedUrl: 'https://feeds.twit.tv/hot_video_hd.xml',
+    hasVideo: true,
+    artworkUrl: 'https://elroy.twit.tv/sites/default/files/styles/twit_album_art_2048x2048/public/images/shows/Hands-On%20Tech/album_art/audio/hot_albumart_standard_1.jpg',
+  },
+  {
+    id: 'ipad',
+    kind: 'builtin',
+    name: 'iOS Today',
+    description: 'iPhone, iPad, Apple Watch, and Apple TV tips, apps, shortcuts, and automation.',
+    feedUrl: 'https://feeds.twit.tv/ipad.xml',
+    videoFeedUrl: 'https://feeds.twit.tv/ipad_video_hd.xml',
+    hasVideo: true,
+    artworkUrl: 'https://elroy.twit.tv/sites/default/files/styles/twit_album_art_2048x2048/public/images/shows/ios_today/album_art/ios2022_albumart_standard_2048.jpg',
+  },
+  {
+    id: 'twis',
+    kind: 'builtin',
+    name: 'This Week in Space',
+    description: 'Space exploration, astronomy, spacecraft, and science with Rod Pyle and Tariq Malik.',
+    feedUrl: 'https://feeds.twit.tv/twis.xml',
+    videoFeedUrl: 'https://feeds.twit.tv/twis_video_hd.xml',
+    hasVideo: true,
+    artworkUrl: 'https://elroy.twit.tv/sites/default/files/styles/twit_album_art_2048x2048/public/images/shows/this_week_in_space/album_art/audio/twis2022_albumart_standard_2400.jpg',
+  },
+  {
+    id: 'htg',
+    kind: 'builtin',
+    name: 'Home Theater Geeks',
+    description: 'Home theater technology, display news, audio/video advice, and expert setup guidance.',
+    feedUrl: 'https://feeds.twit.tv/htg.xml',
+    videoFeedUrl: 'https://feeds.twit.tv/htg_video_hd.xml',
+    hasVideo: true,
+    artworkUrl: 'https://elroy.twit.tv/sites/default/files/styles/twit_album_art_2048x2048/public/images/shows/Home%20Theater%20Geeks/album_art/audio/htg_albumart_standard_1.jpg',
+  },
+  {
+    id: 'hom',
+    kind: 'builtin',
+    name: 'Hands-On Apple',
+    description: 'Mac, iPhone, iPad, and Apple Watch tips, tricks, apps, and hidden features.',
+    feedUrl: 'https://feeds.twit.tv/hom.xml',
+    videoFeedUrl: 'https://feeds.twit.tv/hom_video_hd.xml',
+    hasVideo: true,
+    artworkUrl: 'https://elroy.twit.tv/sites/default/files/styles/twit_album_art_2048x2048/public/images/shows/album_art/HOA_3000_audio.jpg',
+  },
+  {
+    id: 'howin',
+    kind: 'builtin',
+    name: 'Hands-On Windows',
+    description: 'Windows 11 tips, tweaks, customization, and performance advice.',
+    feedUrl: 'https://feeds.twit.tv/howin.xml',
+    videoFeedUrl: 'https://feeds.twit.tv/howin_video_hd.xml',
+    hasVideo: true,
+    artworkUrl: 'https://elroy.twit.tv/sites/default/files/styles/twit_album_art_2048x2048/public/images/shows/hands-on_windows/album_art/how2022_albumart_standard_2048.jpg',
+  },
+  {
+    id: 'uls',
+    kind: 'builtin',
+    name: 'Untitled Linux Show',
+    description: 'Linux news, open source tools, and command line tips.',
+    feedUrl: 'https://feeds.twit.tv/uls.xml',
+    videoFeedUrl: 'https://feeds.twit.tv/uls_video_hd.xml',
+    hasVideo: true,
+    artworkUrl: 'https://elroy.twit.tv/sites/default/files/styles/twit_album_art_2048x2048/public/images/shows/Untitled%20Linux%20Show/album_art/audio/uls_albumart_2400_0.jpg',
+  },
+]

@@ -2,19 +2,22 @@ interface TopBarProps {
   query: string
   isLoading: boolean
   statusLabel: string
+  statusDetail: string
   onQueryChange: (value: string) => void
   onRefresh: () => void
+  onFocusSearch: () => void
+  onFilter: () => void
 }
 
-export function TopBar({ query, isLoading, statusLabel, onQueryChange, onRefresh }: TopBarProps) {
+export function TopBar({ query, isLoading, statusLabel, statusDetail, onQueryChange, onRefresh, onFocusSearch, onFilter }: TopBarProps) {
   return (
     <header className="topbar">
       <div className="history-controls" aria-hidden="true">
-        <button type="button">‹</button>
-        <button type="button">›</button>
+        <button type="button" onClick={onFocusSearch}>‹</button>
+        <button type="button" onClick={onFocusSearch}>›</button>
       </div>
-      <button className="refresh-button" type="button" onClick={onRefresh} disabled={isLoading}>
-        ↻
+      <button className="refresh-button" type="button" aria-label="Refresh feed" onClick={onRefresh} disabled={isLoading}>
+        Refresh
       </button>
       <label className="search-box">
         <span>⌕</span>
@@ -26,12 +29,12 @@ export function TopBar({ query, isLoading, statusLabel, onQueryChange, onRefresh
         />
         <kbd>⌘K</kbd>
       </label>
-      <div className="filter-control">Filter</div>
+      <button className="filter-control" type="button" onClick={onFilter}>Filter</button>
       <div className="health-status">
         <span className={isLoading ? 'pulse-dot' : 'check-dot'} />
         <div>
           <strong>{isLoading ? 'Updating' : statusLabel}</strong>
-          <small>{isLoading ? 'Fetching RSS' : 'Local development mode'}</small>
+          <small>{isLoading ? 'Fetching RSS' : statusDetail}</small>
         </div>
       </div>
     </header>

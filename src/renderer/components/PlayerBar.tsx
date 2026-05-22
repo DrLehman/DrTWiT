@@ -1,15 +1,18 @@
 import type { MouseEvent } from 'react'
-import type { Episode, FeedResult } from '../types'
+import type { Episode } from '../types'
 
 interface PlayerBarProps {
   episode: Episode | null
-  feed: FeedResult | null
+  feedTitle: string | null
   activeMode: 'audio' | 'video'
   isPlaying: boolean
+  isMiniPlayer: boolean
   progress: number
   duration: number
   volume: number
   onTogglePlayback: () => void
+  onToggleMiniPlayer: () => void
+  onFullscreen: () => void
   onSkip: (seconds: number) => void
   onSeek: (percent: number) => void
   onVolumeChange: (volume: number) => void
@@ -17,13 +20,16 @@ interface PlayerBarProps {
 
 export function PlayerBar({
   episode,
-  feed,
+  feedTitle,
   activeMode,
   isPlaying,
+  isMiniPlayer,
   progress,
   duration,
   volume,
   onTogglePlayback,
+  onToggleMiniPlayer,
+  onFullscreen,
   onSkip,
   onSeek,
   onVolumeChange,
@@ -32,21 +38,23 @@ export function PlayerBar({
 
   // The player receives a percent instead of a raw timestamp so the shared
   // transport bar stays presentation-only. App.tsx owns the actual media element
-  // and clamps the resulting time against the active duration.
+  // and clamps the resulting time against the active duration. Keeping this
+  // component media-element-free is also what lets browsing mode and player mode
+  // diverge without this footer accidentally mutating playback.
   function handleSeek(event: MouseEvent<HTMLDivElement>) {
     const bounds = event.currentTarget.getBoundingClientRect()
     onSeek((event.clientX - bounds.left) / bounds.width)
   }
 
   return (
-    <footer className="player-bar">
+    <footer className={`player-bar ${isMiniPlayer ? 'mini' : ''}`}>
       <div className="now-playing">
         <div className="mini-art">
           {episode?.thumbnail ? <img src={episode.thumbnail} alt="" /> : <span>Dr</span>}
         </div>
         <div>
           <strong>{episode?.title ?? 'Select an episode'}</strong>
-          <span>{feed?.title ?? 'No feed loaded'}</span>
+          <span>{feedTitle ?? 'No feed loaded'}</span>
         </div>
       </div>
 
@@ -69,6 +77,12 @@ export function PlayerBar({
 
       <div className="player-tools">
         <span className="mode-readout">{activeMode}</span>
+        <button className="player-tool-button" type="button" onClick={onToggleMiniPlayer} disabled={!episode}>
+          {isMiniPlayer ? 'Dock' : 'Mini'}
+        </button>
+        <button className="player-tool-button" type="button" onClick={onFullscreen} disabled={!episode}>
+          Full
+        </button>
         <label className="volume">
           <span>⌁</span>
           <input

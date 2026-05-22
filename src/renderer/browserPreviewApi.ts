@@ -1,112 +1,119 @@
-import type { FeedRequest, FeedResult, FeedSource, TwitAPI } from './types'
+import type {
+  DownloadItem,
+  DownloadRequest,
+  DownloadSettings,
+  FeedRequest,
+  FeedResult,
+  FeedSource,
+  SubscriptionSettings,
+  TwitAPI,
+} from './types'
 
-const PREVIEW_SOURCES: FeedSource[] = [
-  {
-    id: 'twit',
-    kind: 'builtin',
-    name: 'This Week in Tech',
-    description: 'Leo Laporte and friends discuss the latest in tech.',
-  },
-  {
-    id: 'sn',
-    kind: 'builtin',
-    name: 'Security Now',
-    description: 'Security analysis for people who need the details.',
-  },
-  {
-    id: 'mbw',
-    kind: 'builtin',
-    name: 'MacBreak Weekly',
-    description: 'Apple news, products, and platform conversation.',
-  },
-  {
-    id: 'ww',
-    kind: 'builtin',
-    name: 'Windows Weekly',
-    description: 'Microsoft, Windows, Surface, and Xbox coverage.',
-  },
-  {
-    id: 'twig',
-    kind: 'builtin',
-    name: 'This Week in Google',
-    description: 'Google, web platforms, AI, and policy discussion.',
-  },
-  {
-    id: 'floss',
-    kind: 'builtin',
-    name: 'FLOSS Weekly',
-    description: 'Open source people, projects, and communities.',
-  },
-  {
-    id: 'hot',
-    kind: 'builtin',
-    name: 'Hands-On Tech',
-    description: 'Practical answers for devices, apps, and services.',
-  },
-  {
-    id: 'tnw',
-    kind: 'builtin',
-    name: 'Tech News Weekly',
-    description: 'A weekly look at the most important technology stories.',
-  },
-]
+const previewDownloadStore = new Map<string, DownloadItem>()
+let previewDownloadSettings: DownloadSettings = {
+  downloadDirectory: null,
+  maxEpisodes: 25,
+  maxDiskMegabytes: 2048,
+  deleteAfterListen: false,
+}
+let previewSubscriptions: SubscriptionSettings[] = []
 
-// Browser QA runs against Vite without Electron's preload bridge. This preview
-// API keeps that rendered path useful by supplying deterministic data with the
-// same shape as the Electron IPC contract. The production app path still uses
-// window.twit, so real RSS fetching remains owned by the main process.
+async function readJsonResponse<T>(response: Response): Promise<T> {
+  const payload = await response.json().catch(() => null) as { message?: string } | T | null
+
+  if (!response.ok) {
+    const message = payload && typeof payload === 'object' && 'message' in payload && payload.message
+      ? payload.message
+      : 'The local development feed endpoint failed.'
+    throw new Error(message)
+  }
+
+  return payload as T
+}
+
+// Browser UI work runs through Vite, not Electron, so the preload IPC bridge is
+// unavailable. This API calls a dev-only Vite middleware that fetches and parses
+// the same RSS URLs as Electron's main process. That keeps browser iteration
+// honest: episode titles, dates, images, MP3 URLs, and custom feed behavior come
+// from real feeds instead of canned sample data.
 export const browserPreviewApi: TwitAPI = {
-  getBuiltInSources: async () => PREVIEW_SOURCES,
-  getFeed: async (request: FeedRequest): Promise<FeedResult> => {
-    const source = PREVIEW_SOURCES.find(candidate => candidate.id === request.id)
-    const isCustom = request.kind === 'custom'
-    const title = isCustom ? 'Member RSS Feed' : source?.name ?? 'This Week in Tech'
-
-    return {
-      sourceId: request.id,
-      sourceKind: request.kind,
-      title,
-      description: isCustom
-        ? 'A private RSS feed saved locally for this development preview.'
-        : source?.description ?? 'A curated TWiT network show.',
-      image: null,
-      author: isCustom ? 'Local feed' : 'TWiT',
-      updatedAt: new Date().toISOString(),
-      episodes: [
-        {
-          guid: `${request.id}-1001`,
-          title: 'Episode 1001: AI Accessories',
-          description: 'Meta glasses, Google I/O recap, and all the week’s tech news.',
-          pubDate: '2026-05-18T14:00:00.000Z',
-          duration: '2:10:36',
-          thumbnail: null,
-          audioUrl: 'https://archive.org/download/testmp3testfile/mpthreetest.mp3',
-          videoUrl: null,
-          link: 'https://twit.tv/',
-        },
-        {
-          guid: `${request.id}-1000`,
-          title: 'Episode 1000: The Big 1000',
-          description: 'Stories, memories, and special guests from across the network.',
-          pubDate: '2026-05-11T14:00:00.000Z',
-          duration: '2:05:12',
-          thumbnail: null,
-          audioUrl: 'https://archive.org/download/testmp3testfile/mpthreetest.mp3',
-          videoUrl: null,
-          link: 'https://twit.tv/',
-        },
-        {
-          guid: `${request.id}-999`,
-          title: 'Episode 999: Deep Research',
-          description: 'AI research tools, developer announcements, and product shifts.',
-          pubDate: '2026-05-04T14:00:00.000Z',
-          duration: '2:02:44',
-          thumbnail: null,
-          audioUrl: 'https://archive.org/download/testmp3testfile/mpthreetest.mp3',
-          videoUrl: null,
-          link: 'https://twit.tv/',
-        },
-      ],
-    }
+  getBuiltInSources: async (): Promise<FeedSource[]> => {
+    const response = await fetch('/api/built-in-sources')
+    return readJsonResponse<FeedSource[]>(response)
   },
+  getFeed: async (request: FeedRequest): Promise<FeedResult> => {
+    const response = await fetch('/api/feed', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(request),
+    })
+    return readJsonResponse<FeedResult>(response)
+  },
+  getEpisodePageText: async (url: string): Promise<string> => {
+    const response = await fetch('/api/episode-page-text', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ url }),
+    })
+    return readJsonResponse<string>(response)
+  },
+  getDownloads: async (): Promise<DownloadItem[]> => {
+    return Array.from(previewDownloadStore.values())
+  },
+  downloadEpisode: async (request: DownloadRequest): Promise<DownloadItem> => {
+    const mediaUrl = request.mediaKind === 'video' ? request.episode.videoUrl : request.episode.audioUrl
+    if (!mediaUrl) {
+      throw new Error(`No ${request.mediaKind} media URL is available for this episode.`)
+    }
+
+    const item: DownloadItem = {
+      id: `${request.episode.guid}-${request.mediaKind}`,
+      episodeGuid: request.episode.guid,
+      sourceId: request.sourceId,
+      sourceName: request.sourceName,
+      title: request.episode.title,
+      mediaKind: request.mediaKind,
+      mediaUrl,
+      fileName: `${request.episode.title.replace(/[^\w.-]+/g, '-').slice(0, 80)}.${request.mediaKind === 'video' ? 'mp4' : 'mp3'}`,
+      filePath: null,
+      status: 'available',
+      progress: 1,
+      error: null,
+      createdAt: new Date().toISOString(),
+      completedAt: new Date().toISOString(),
+      listenedAt: null,
+    }
+    previewDownloadStore.set(item.id, item)
+    return item
+  },
+  deleteDownload: async (id: string): Promise<DownloadItem[]> => {
+    previewDownloadStore.delete(id)
+    return Array.from(previewDownloadStore.values())
+  },
+  markDownloadListened: async (id: string): Promise<DownloadItem[]> => {
+    const item = previewDownloadStore.get(id)
+    if (item) {
+      previewDownloadStore.set(id, { ...item, status: 'listened', listenedAt: new Date().toISOString() })
+    }
+    return Array.from(previewDownloadStore.values())
+  },
+  revealDownload: async (): Promise<void> => undefined,
+  getDownloadSettings: async (): Promise<DownloadSettings> => previewDownloadSettings,
+  saveDownloadSettings: async (settings: DownloadSettings): Promise<DownloadSettings> => {
+    previewDownloadSettings = settings
+    return previewDownloadSettings
+  },
+  getSubscriptions: async (): Promise<SubscriptionSettings[]> => previewSubscriptions,
+  saveSubscription: async (settings: SubscriptionSettings): Promise<SubscriptionSettings[]> => {
+    previewSubscriptions = [
+      ...previewSubscriptions.filter(subscription => subscription.sourceId !== settings.sourceId),
+      settings,
+    ]
+    return previewSubscriptions
+  },
+  openMiniPlayer: async (): Promise<void> => undefined,
 }
