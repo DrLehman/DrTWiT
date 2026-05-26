@@ -1,0 +1,61 @@
+# Dependencies
+node_modules/
+
+# Build and package output
+dist/
+release/
+out/
+*.dmg
+*.pkg
+*.AppImage
+*.exe
+*.blockmap
+*.snap
+builder-debug.yml
+builder-effective-config.yaml
+
+# Electron Builder and Vite caches
+.electron-builder/
+.vite/
+node_modules/.vite/
+
+# TypeScript and test output
+*.tsbuildinfo
+coverage/
+.nyc_output/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Environment and local configuration
+.env
+.env.*
+!.env.example
+*.local
+secrets/
+
+# Editor and tool state
+.idea/
+.vscode/
+*.swp
+*.swo
+*.tmp
+*.bak
+
+# OS metadata
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+Desktop.ini
